@@ -1,3 +1,8 @@
+/**
+ * A scroll view component with parallax header effect
+ * Creates a smooth scrolling experience with a header that scales and translates
+ * based on scroll position
+ */
 import type { PropsWithChildren, ReactElement } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, {
@@ -11,13 +16,24 @@ import { ThemedView } from '@/components/ThemedView';
 import { useBottomTabOverflow } from '@/components/ui/TabBarBackground';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
+// Height of the parallax header
 const HEADER_HEIGHT = 250;
 
+/**
+ * Props for the ParallaxScrollView component
+ * Extends PropsWithChildren with header configuration
+ */
 type Props = PropsWithChildren<{
+  /** React element to display in the header */
   headerImage: ReactElement;
+  /** Background colors for light/dark mode */
   headerBackgroundColor: { dark: string; light: string };
 }>;
 
+/**
+ * ParallaxScrollView component that creates a scrollable view with a parallax header
+ * The header scales and translates based on scroll position for a dynamic effect
+ */
 export default function ParallaxScrollView({
   children,
   headerImage,
@@ -27,10 +43,13 @@ export default function ParallaxScrollView({
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollOffset = useScrollViewOffset(scrollRef);
   const bottom = useBottomTabOverflow();
+
+  // Create animated style for the header based on scroll position
   const headerAnimatedStyle = useAnimatedStyle(() => {
     return {
       transform: [
         {
+          // Translate header based on scroll position
           translateY: interpolate(
             scrollOffset.value,
             [-HEADER_HEIGHT, 0, HEADER_HEIGHT],
@@ -38,6 +57,7 @@ export default function ParallaxScrollView({
           ),
         },
         {
+          // Scale header based on scroll position
           scale: interpolate(scrollOffset.value, [-HEADER_HEIGHT, 0, HEADER_HEIGHT], [2, 1, 1]),
         },
       ],
@@ -51,6 +71,7 @@ export default function ParallaxScrollView({
         scrollEventThrottle={16}
         scrollIndicatorInsets={{ bottom }}
         contentContainerStyle={{ paddingBottom: bottom }}>
+        {/* Animated header with parallax effect */}
         <Animated.View
           style={[
             styles.header,
@@ -59,6 +80,7 @@ export default function ParallaxScrollView({
           ]}>
           {headerImage}
         </Animated.View>
+        {/* Main content */}
         <ThemedView style={styles.content}>{children}</ThemedView>
       </Animated.ScrollView>
     </ThemedView>

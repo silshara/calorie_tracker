@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { databaseService, MonthlySummary } from '../services/databaseService';
 
 /**
@@ -6,12 +6,12 @@ import { databaseService, MonthlySummary } from '../services/databaseService';
  * Contains all information about a logged meal
  */
 export interface Meal {
-  id: string;              
-  timestamp: number;       
-  imageUri: string;        
-  foodItems: string[];   
-  calories: number;     
-  confidence: number;   
+  id: string;              // Unique identifier for the meal
+  timestamp: number;       // Unix timestamp when the meal was logged
+  imageUri: string;        // URI of the meal's image
+  foodItems: string[];     // List of detected food items
+  calories: number;        // Estimated calories for the meal
+  confidence: number;      // Confidence score of the food detection (0-100)
 }
 
 /**
@@ -19,12 +19,12 @@ export interface Meal {
  * Provides all meal-related operations and state to the app
  */
 interface MealContextType {
-  meals: Meal[];                          
-  totalCalories: number;               
-  isLoading: boolean;                  
-  error: string | null;                   
-  currentDate: Date;                     
-  monthlySummary: MonthlySummary | null; 
+  meals: Meal[];                          // Current day's meals
+  totalCalories: number;                  // Total calories for the current day
+  isLoading: boolean;                     // Loading state for async operations
+  error: string | null;                   // Error state for failed operations
+  currentDate: Date;                      // Current date being viewed
+  monthlySummary: MonthlySummary | null;  // Current month's summary
   addMeal: (meal: Omit<Meal, 'id' | 'timestamp'>) => Promise<void>;
   removeMeal: (id: string) => Promise<void>;
   getMealsByDate: (date: Date) => Promise<Meal[]>;

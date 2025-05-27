@@ -1,3 +1,8 @@
+/**
+ * Onboarding Screen Component
+ * Displays a series of introductory slides to help users understand the app's features
+ * Includes smooth animations, pagination, and navigation controls
+ */
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useRef, useState } from 'react';
@@ -9,8 +14,13 @@ import { ThemedView } from '@/components/ThemedView';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
+// Get screen width for slide dimensions
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+/**
+ * Onboarding slide data
+ * Defines the content for each onboarding slide
+ */
 const onboardingData = [
   {
     title: 'Welcome to Calorie Tracker',
@@ -29,12 +39,21 @@ const onboardingData = [
   },
 ];
 
+/**
+ * OnboardingScreen component
+ * Implements a horizontal swipeable onboarding experience with animations
+ */
 export default function OnboardingScreen() {
+  // State for tracking current slide and theme
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
+  /**
+   * Handles navigation to the next slide or main app
+   * If on last slide, navigates to main app screen
+   */
   const handleNext = () => {
     if (currentIndex < onboardingData.length - 1) {
       flatListRef.current?.scrollToIndex({
@@ -47,11 +66,17 @@ export default function OnboardingScreen() {
     }
   };
 
+  /**
+   * Skips the onboarding process and navigates to main app
+   */
   const handleSkip = () => {
-    // Skip directly to the main app screen
     router.replace('/(tabs)');
   };
 
+  /**
+   * Renders a single onboarding slide
+   * Includes image, title, and description with fade animations
+   */
   const renderItem = ({ item, index }: { item: typeof onboardingData[0]; index: number }) => (
     <Animated.View 
       entering={FadeIn} 
@@ -72,24 +97,31 @@ export default function OnboardingScreen() {
     </Animated.View>
   );
 
+  /**
+   * Updates current slide index when visible items change
+   * Used for pagination dots and navigation
+   */
   const handleViewableItemsChanged = useRef(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
       setCurrentIndex(viewableItems[0].index);
     }
   }).current;
 
+  // Configuration for determining when a slide is considered visible
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 50,
   }).current;
 
   return (
     <ThemedView style={styles.container}>
+      {/* Skip button in top-right corner */}
       <View style={styles.skipContainer}>
         <TouchableOpacity onPress={handleSkip}>
           <ThemedText style={styles.skipButton}>Skip</ThemedText>
         </TouchableOpacity>
       </View>
 
+      {/* Horizontal scrollable slides */}
       <FlatList
         ref={flatListRef}
         data={onboardingData}
@@ -102,7 +134,9 @@ export default function OnboardingScreen() {
         keyExtractor={(_, index) => index.toString()}
       />
 
+      {/* Bottom navigation and pagination */}
       <View style={styles.footer}>
+        {/* Pagination dots */}
         <View style={styles.pagination}>
           {onboardingData.map((_, index) => (
             <View
@@ -119,6 +153,7 @@ export default function OnboardingScreen() {
           ))}
         </View>
 
+        {/* Next/Get Started button */}
         <TouchableOpacity
           style={[styles.button, { backgroundColor: colors.tint }]}
           onPress={handleNext}
@@ -132,6 +167,10 @@ export default function OnboardingScreen() {
   );
 }
 
+/**
+ * Styles for the Onboarding Screen
+ * Includes layout, animations, and theme-specific styling
+ */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
