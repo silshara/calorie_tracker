@@ -1,22 +1,30 @@
-import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { databaseService, MonthlySummary } from '../services/databaseService';
 
+/**
+ * Represents a single meal entry in the app
+ * Contains all information about a logged meal
+ */
 export interface Meal {
-  id: string;
-  timestamp: number;
-  imageUri: string;
-  foodItems: string[];
-  calories: number;
-  confidence: number;
+  id: string;              
+  timestamp: number;       
+  imageUri: string;        
+  foodItems: string[];   
+  calories: number;     
+  confidence: number;   
 }
 
+/**
+ * Defines the shape of the MealContext
+ * Provides all meal-related operations and state to the app
+ */
 interface MealContextType {
-  meals: Meal[];
-  totalCalories: number;
-  isLoading: boolean;
-  error: string | null;
-  currentDate: Date;
-  monthlySummary: MonthlySummary | null;
+  meals: Meal[];                          
+  totalCalories: number;               
+  isLoading: boolean;                  
+  error: string | null;                   
+  currentDate: Date;                     
+  monthlySummary: MonthlySummary | null; 
   addMeal: (meal: Omit<Meal, 'id' | 'timestamp'>) => Promise<void>;
   removeMeal: (id: string) => Promise<void>;
   getMealsByDate: (date: Date) => Promise<Meal[]>;
@@ -25,9 +33,15 @@ interface MealContextType {
   refreshCurrentDate: () => void;
 }
 
+// Create the context with undefined as initial value
 const MealContext = createContext<MealContextType | undefined>(undefined);
 
+/**
+ * Provider component for the MealContext
+ * Manages all meal-related state and operations
+ */
 export function MealProvider({ children }: { children: ReactNode }) {
+  // State management
   const [meals, setMeals] = useState<Meal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +60,10 @@ export function MealProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
+  /**
+   * Checks if the current date has changed
+   * If it has, updates the current date and reloads meals
+   */
   const checkDateChange = () => {
     const now = new Date();
     if (now.getDate() !== currentDate.getDate() ||
@@ -56,9 +74,13 @@ export function MealProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /**
+   * Loads meals for the current date and updates the monthly summary
+   */
   const loadMeals = async () => {
     try {
       setIsLoading(true);
+      // Get meals for the current date
       const todayMeals = await databaseService.getDailyMeals(currentDate);
       setMeals(todayMeals);
       
@@ -78,9 +100,14 @@ export function MealProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /**
+   * Gets the monthly summary for a specific month
+   * Updates the current month's summary if applicable
+   */
   const getMonthlySummary = async (month: number, year: number) => {
     try {
       const summary = await databaseService.getMonthlySummary(month, year);
+      // Update current month's summary if the requested month is current
       if (month === currentDate.getMonth() && year === currentDate.getFullYear()) {
         setMonthlySummary(summary);
       }
@@ -91,13 +118,22 @@ export function MealProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /**
+   * Refreshes the current date and reloads meals
+   * Used when the app comes back to the foreground
+   */
   const refreshCurrentDate = () => {
     setCurrentDate(new Date());
     loadMeals();
   };
 
+  /**
+   * Adds a new meal to the database
+   * Updates the current day's meals and monthly summary if applicable
+   */
   const addMeal = async (meal: Omit<Meal, 'id' | 'timestamp'>) => {
     try {
+      // Create a new meal with generated ID and current timestamp
       const newMeal: Meal = {
         ...meal,
         id: Math.random().toString(36).substr(2, 9),
@@ -126,6 +162,10 @@ export function MealProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /**
+   * Removes a meal from the database
+   * Updates the current day's meals and monthly summary if applicable
+   */
   const removeMeal = async (id: string) => {
     try {
       const mealToRemove = meals.find(meal => meal.id === id);
@@ -153,6 +193,9 @@ export function MealProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /**
+   * Gets all meals for a specific date
+   */
   const getMealsByDate = async (date: Date) => {
     try {
       return await databaseService.getMealsByDate(date);
@@ -163,12 +206,17 @@ export function MealProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /**
+   * Refreshes the current day's meals
+   */
   const refreshMeals = async () => {
     await loadMeals();
   };
 
+  // Calculate total calories for the current day
   const totalCalories = meals.reduce((sum, meal) => sum + meal.calories, 0);
 
+  // Provide the context value to children
   return (
     <MealContext.Provider value={{ 
       meals, 
@@ -189,6 +237,10 @@ export function MealProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Custom hook to use the MealContext
+ * Throws an error if used outside of a MealProvider
+ */
 export function useMeals() {
   const context = useContext(MealContext);
   if (context === undefined) {

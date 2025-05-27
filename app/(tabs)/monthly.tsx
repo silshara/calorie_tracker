@@ -8,20 +8,35 @@ import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useMeals } from '../context/MealContext';
 import { MonthlySummary } from '../services/databaseService';
 
+/**
+ * Monthly Report Screen Component
+ * Displays a summary of nutrition data for a selected month
+ * Includes total calories, daily averages, and a breakdown of meals
+ */
 export default function MonthlyReportScreen() {
+  // Get required functions and data from the meal context
   const { getMonthlySummary, monthlySummary: currentMonthSummary } = useMeals();
+  
+  // State management
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [monthlyData, setMonthlyData] = useState<MonthlySummary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Theme management
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
+  // Load monthly data when the screen comes into focus or month changes
   useFocusEffect(
     useCallback(() => {
       loadMonthlyData();
     }, [selectedMonth])
   );
 
+  /**
+   * Loads the monthly summary data for the selected month
+   * Updates the loading state and handles any errors
+   */
   const loadMonthlyData = async () => {
     try {
       setIsLoading(true);
@@ -37,12 +52,20 @@ export default function MonthlyReportScreen() {
     }
   };
 
+  /**
+   * Changes the selected month by the specified number of months
+   * @param months - Number of months to add (positive) or subtract (negative)
+   */
   const changeMonth = (months: number) => {
     const newDate = new Date(selectedMonth);
     newDate.setMonth(newDate.getMonth() + months);
     setSelectedMonth(newDate);
   };
 
+  /**
+   * Formats the month and year for display
+   * Uses the Finland timezone for consistent date handling
+   */
   const formatMonthYear = (date: Date) => {
     return date.toLocaleString('default', { 
       month: 'long', 
@@ -51,6 +74,10 @@ export default function MonthlyReportScreen() {
     });
   };
 
+  /**
+   * Renders the daily breakdown section
+   * Shows calories and meal count for each day in the month
+   */
   const renderDailyBreakdown = () => {
     if (!monthlyData) return null;
 
@@ -85,6 +112,7 @@ export default function MonthlyReportScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      {/* Month Navigation Header */}
       <View style={styles.header}>
         <TouchableOpacity 
           onPress={() => changeMonth(-1)}
@@ -105,11 +133,13 @@ export default function MonthlyReportScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Main Content */}
       <ScrollView style={styles.content}>
         {isLoading ? (
           <ThemedText style={styles.loadingText}>Loading...</ThemedText>
         ) : monthlyData ? (
           <>
+            {/* Monthly Summary Cards */}
             <View style={styles.summaryContainer}>
               <View style={[styles.summaryCard, { backgroundColor: colors.tint + '20' }]}>
                 <ThemedText style={styles.summaryTitle}>Total Calories</ThemedText>
@@ -133,6 +163,7 @@ export default function MonthlyReportScreen() {
               </View>
             </View>
 
+            {/* Daily Breakdown Section */}
             <View style={styles.dailyBreakdown}>
               <ThemedText style={styles.sectionTitle}>Daily Breakdown</ThemedText>
               {renderDailyBreakdown()}
@@ -146,10 +177,14 @@ export default function MonthlyReportScreen() {
   );
 }
 
+/**
+ * Styles for the Monthly Report Screen
+ * Includes layout, colors, and typography
+ */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    marginTop: 16,
+    marginTop: 16, // Add spacing from the top
   },
   header: {
     flexDirection: 'row',

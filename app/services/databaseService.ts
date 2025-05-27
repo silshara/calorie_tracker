@@ -1,12 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Meal } from '../context/MealContext';
 
-// Storage keys
+/**
+ * Storage keys for persisting different types of data
+ * Using AsyncStorage to maintain data between app sessions
+ */
 const MEALS_STORAGE_KEY = '@calorie_tracker_meals';
 const DAILY_GOALS_KEY = '@calorie_tracker_goals';
 const USER_PROFILE_KEY = '@calorie_tracker_profile';
 
-// Types
+/**
+ * Interface defining the daily nutrition goals for the user
+ */
 export interface DailyGoals {
   calories: number;
   protein: number;
@@ -14,6 +19,10 @@ export interface DailyGoals {
   fat: number;
 }
 
+/**
+ * Interface defining the user's profile information
+ * Used for calculating personalized nutrition goals
+ */
 export interface UserProfile {
   name: string;
   weight: number;
@@ -23,6 +32,10 @@ export interface UserProfile {
   goal: 'lose' | 'maintain' | 'gain';
 }
 
+/**
+ * Interface for monthly nutrition summary data
+ * Contains aggregated statistics for a specific month
+ */
 export interface MonthlySummary {
   month: number; // 0-11
   year: number;
@@ -37,6 +50,10 @@ export interface MonthlySummary {
   };
 }
 
+/**
+ * Interface defining all database operations
+ * Provides type safety for database interactions
+ */
 export interface DatabaseService {
   // Meal operations
   saveMeals: (meals: Meal[]) => Promise<void>;
@@ -56,13 +73,17 @@ export interface DatabaseService {
   // Utility operations
   clearAllData: () => Promise<void>;
   
-  // New methods for monthly data
+  // Monthly data operations
   getMealsByMonth: (month: number, year: number) => Promise<Meal[]>;
   getMonthlySummary: (month: number, year: number) => Promise<MonthlySummary>;
   getDailyMeals: (date: Date) => Promise<Meal[]>;
 }
 
-// Helper function to get start and end of day in local timezone
+/**
+ * Helper function to get the start and end timestamps for a given day in local timezone
+ * @param date - The date to get the range for
+ * @returns Object containing start and end timestamps for the day
+ */
 function getLocalDayRange(date: Date): { start: number; end: number } {
   const localDate = new Date(date);
   localDate.setHours(0, 0, 0, 0);
@@ -75,7 +96,12 @@ function getLocalDayRange(date: Date): { start: number; end: number } {
   return { start, end };
 }
 
-// Helper function to get start and end of month in local timezone
+/**
+ * Helper function to get the start and end timestamps for a given month in local timezone
+ * @param month - The month (0-11)
+ * @param year - The year
+ * @returns Object containing start and end timestamps for the month
+ */
 function getLocalMonthRange(month: number, year: number): { start: number; end: number } {
   const startDate = new Date(year, month, 1);
   startDate.setHours(0, 0, 0, 0);
@@ -88,16 +114,25 @@ function getLocalMonthRange(month: number, year: number): { start: number; end: 
   return { start, end };
 }
 
+/**
+ * In-memory database implementation with AsyncStorage persistence
+ * Provides fast access to data while maintaining persistence
+ */
 class InMemoryDatabase implements DatabaseService {
+  // In-memory cache for different data types
   private mealsCache: Meal[] = [];
   private goalsCache: DailyGoals | null = null;
   private profileCache: UserProfile | null = null;
   private isInitialized = false;
 
+  /**
+   * Initializes the database by loading all data from AsyncStorage
+   * Only runs once when the database is first accessed
+   */
   private async initialize() {
     if (!this.isInitialized) {
       try {
-        // Load all data in parallel
+        // Load all data in parallel for better performance
         const [meals, goals, profile] = await Promise.all([
           this.loadFromStorage<Meal[]>(MEALS_STORAGE_KEY, []),
           this.loadFromStorage<DailyGoals | null>(DAILY_GOALS_KEY, null),
@@ -110,7 +145,7 @@ class InMemoryDatabase implements DatabaseService {
         this.isInitialized = true;
       } catch (error) {
         console.error('Failed to initialize database:', error);
-        // Initialize with empty data
+        // Initialize with empty data on error
         this.mealsCache = [];
         this.goalsCache = null;
         this.profileCache = null;
@@ -119,6 +154,11 @@ class InMemoryDatabase implements DatabaseService {
     }
   }
 
+  /**
+   * Generic method to load data from AsyncStorage
+   * @param key - The storage key to load from
+   * @param defaultValue - The default value to return if no data exists
+   */
   private async loadFromStorage<T>(key: string, defaultValue: T): Promise<T> {
     try {
       const data = await AsyncStorage.getItem(key);
@@ -129,6 +169,11 @@ class InMemoryDatabase implements DatabaseService {
     }
   }
 
+  /**
+   * Generic method to save data to AsyncStorage
+   * @param key - The storage key to save to
+   * @param data - The data to save
+   */
   private async saveToStorage<T>(key: string, data: T): Promise<void> {
     try {
       await AsyncStorage.setItem(key, JSON.stringify(data));
@@ -139,6 +184,10 @@ class InMemoryDatabase implements DatabaseService {
   }
 
   // Meal operations
+  /**
+   * Saves all meals to storage and updates the cache
+   * @param meals - Array of meals to save
+   */
   async saveMeals(meals: Meal[]): Promise<void> {
     try {
       await this.initialize();
@@ -150,6 +199,10 @@ class InMemoryDatabase implements DatabaseService {
     }
   }
 
+  /**
+   * Loads all meals from the cache
+   * @returns Array of all meals
+   */
   async loadMeals(): Promise<Meal[]> {
     try {
       await this.initialize();
@@ -160,6 +213,10 @@ class InMemoryDatabase implements DatabaseService {
     }
   }
 
+  /**
+   * Adds a new meal to storage and updates the cache
+   * @param meal - The meal to add
+   */
   async addMeal(meal: Meal): Promise<void> {
     try {
       await this.initialize();
@@ -171,6 +228,10 @@ class InMemoryDatabase implements DatabaseService {
     }
   }
 
+  /**
+   * Removes a meal from storage and updates the cache
+   * @param id - The ID of the meal to remove
+   */
   async removeMeal(id: string): Promise<void> {
     try {
       await this.initialize();
@@ -182,6 +243,11 @@ class InMemoryDatabase implements DatabaseService {
     }
   }
 
+  /**
+   * Gets all meals for a specific date
+   * @param date - The date to get meals for
+   * @returns Array of meals for the specified date
+   */
   async getMealsByDate(date: Date): Promise<Meal[]> {
     try {
       await this.initialize();
@@ -197,6 +263,10 @@ class InMemoryDatabase implements DatabaseService {
   }
 
   // Goals operations
+  /**
+   * Saves daily nutrition goals to storage and updates the cache
+   * @param goals - The goals to save
+   */
   async saveDailyGoals(goals: DailyGoals): Promise<void> {
     try {
       await this.initialize();
@@ -208,6 +278,10 @@ class InMemoryDatabase implements DatabaseService {
     }
   }
 
+  /**
+   * Loads daily nutrition goals from the cache
+   * @returns The saved goals or null if none exist
+   */
   async loadDailyGoals(): Promise<DailyGoals | null> {
     try {
       await this.initialize();
@@ -219,6 +293,10 @@ class InMemoryDatabase implements DatabaseService {
   }
 
   // Profile operations
+  /**
+   * Saves user profile to storage and updates the cache
+   * @param profile - The profile to save
+   */
   async saveUserProfile(profile: UserProfile): Promise<void> {
     try {
       await this.initialize();
@@ -230,6 +308,10 @@ class InMemoryDatabase implements DatabaseService {
     }
   }
 
+  /**
+   * Loads user profile from the cache
+   * @returns The saved profile or null if none exists
+   */
   async loadUserProfile(): Promise<UserProfile | null> {
     try {
       await this.initialize();
@@ -241,6 +323,9 @@ class InMemoryDatabase implements DatabaseService {
   }
 
   // Utility operations
+  /**
+   * Clears all data from storage and resets the cache
+   */
   async clearAllData(): Promise<void> {
     try {
       await Promise.all([
@@ -259,7 +344,13 @@ class InMemoryDatabase implements DatabaseService {
     }
   }
 
-  // New methods for monthly data
+  // Monthly data operations
+  /**
+   * Gets all meals for a specific month
+   * @param month - The month (0-11)
+   * @param year - The year
+   * @returns Array of meals for the specified month
+   */
   async getMealsByMonth(month: number, year: number): Promise<Meal[]> {
     try {
       await this.initialize();
@@ -274,6 +365,12 @@ class InMemoryDatabase implements DatabaseService {
     }
   }
 
+  /**
+   * Calculates and returns a summary of nutrition data for a specific month
+   * @param month - The month (0-11)
+   * @param year - The year
+   * @returns Monthly summary containing aggregated statistics
+   */
   async getMonthlySummary(month: number, year: number): Promise<MonthlySummary> {
     try {
       const meals = await this.getMealsByMonth(month, year);
@@ -310,6 +407,11 @@ class InMemoryDatabase implements DatabaseService {
     }
   }
 
+  /**
+   * Gets all meals for a specific day
+   * @param date - The date to get meals for
+   * @returns Array of meals for the specified day
+   */
   async getDailyMeals(date: Date): Promise<Meal[]> {
     try {
       await this.initialize();
@@ -325,5 +427,5 @@ class InMemoryDatabase implements DatabaseService {
   }
 }
 
-// Export a singleton instance
+// Export a singleton instance of the database
 export const databaseService = new InMemoryDatabase(); 
