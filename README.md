@@ -140,10 +140,3 @@ The app includes basic error handling and data validation. To test the app:
    - Remove node_modules: `rm -rf node_modules`
    - Reinstall dependencies: `npm install`
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-For support, please open an issue in the repository or contact the development team.
