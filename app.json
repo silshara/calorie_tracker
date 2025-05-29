@@ -52,7 +52,8 @@
           "photosPermission": "The app accesses your photos to let you share them for food analysis.",
           "cameraPermission": "The app accesses your camera to let you take photos of food for analysis."
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true

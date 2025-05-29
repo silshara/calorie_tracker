@@ -6,7 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useMeals } from '../context/MealContext';
-import { MonthlySummary } from '../services/databaseService';
+import { MonthlySummary } from '../types/database';
 
 /**
  * Monthly Report Screen Component
@@ -15,7 +15,7 @@ import { MonthlySummary } from '../services/databaseService';
  */
 export default function MonthlyReportScreen() {
   // Get required functions and data from the meal context
-  const { getMonthlySummary, monthlySummary: currentMonthSummary } = useMeals();
+  const { getMonthlySummary, monthlySummary: currentMonthSummary, dailyGoal } = useMeals();
   
   // State management
   const [selectedMonth, setSelectedMonth] = useState(new Date());
@@ -77,37 +77,74 @@ export default function MonthlyReportScreen() {
   /**
    * Renders the daily breakdown section
    * Shows calories and meal count for each day in the month
+   * Includes progress towards daily goal
    */
   const renderDailyBreakdown = () => {
     if (!monthlyData) return null;
 
-    return Object.entries(monthlyData.dailyAverages)
-      .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
-      .map(([dateKey, data]) => {
-        // Parse the date key (YYYY-MM-DD) and create a local date
-        const [year, month, day] = dateKey.split('-').map(Number);
-        const localDate = new Date(year, month - 1, day); // month is 0-based in JavaScript
-
-        return (
-          <View key={dateKey} style={styles.dailyItem}>
-            <ThemedText style={styles.dateText}>
-              {localDate.toLocaleDateString('default', { 
-                month: 'short', 
-                day: 'numeric',
-                timeZone: 'Europe/Helsinki' // Use Finland timezone
-              })}
-            </ThemedText>
-            <View style={styles.dailyStats}>
-              <ThemedText style={styles.calorieText}>
-                {Math.round(data.calories)} cal
+    return (
+      <View>
+        {/* Column Headers */}
+        <View style={[styles.dailyItem, styles.headerRow]}>
+          <View style={styles.dateContainer}>
+            <ThemedText style={styles.columnHeader}>Date</ThemedText>
+          </View>
+          <View style={styles.dailyStats}>
+            <View style={styles.calorieContainer}>
+              <ThemedText style={[styles.columnHeader, styles.calorieHeader]}>
+                Calories
               </ThemedText>
-              <ThemedText style={styles.mealCountText}>
-                {data.meals} meals
+              <ThemedText style={[styles.columnHeader, styles.goalHeader]}>
+                Goal %
               </ThemedText>
             </View>
+            <ThemedText style={[styles.columnHeader, styles.mealCountHeader]}>
+              Meals
+            </ThemedText>
           </View>
-        );
-      });
+        </View>
+
+        {/* Daily Items */}
+        {Object.entries(monthlyData.dailyAverages)
+          .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+          .map(([dateKey, data]) => {
+            // Parse the date key (YYYY-MM-DD) and create a local date
+            const [year, month, day] = dateKey.split('-').map(Number);
+            const localDate = new Date(year, month - 1, day);
+            const goalProgress = Math.min(Math.round((data.calories / dailyGoal) * 100), 100);
+
+            return (
+              <View key={dateKey} style={styles.dailyItem}>
+                <View style={styles.dateContainer}>
+                  <ThemedText style={styles.dateText}>
+                    {localDate.toLocaleDateString('default', { 
+                      month: 'numeric', 
+                      day: 'numeric',
+                      timeZone: 'Europe/Helsinki'
+                    })}
+                  </ThemedText>
+                </View>
+                <View style={styles.dailyStats}>
+                  <View style={styles.calorieContainer}>
+                    <ThemedText style={[styles.calorieText, styles.calorieValue]}>
+                      {Math.round(data.calories)} / {dailyGoal} cal
+                    </ThemedText>
+                    <ThemedText style={[
+                      styles.goalProgress,
+                      { color: goalProgress > 100 ? '#FF3B30' : colors.tint }
+                    ]}>
+                      {goalProgress}%
+                    </ThemedText>
+                  </View>
+                  <ThemedText style={styles.mealCountText}>
+                    {data.meals} meals
+                  </ThemedText>
+                </View>
+              </View>
+            );
+          })}
+      </View>
+    );
   };
 
   return (
@@ -136,7 +173,7 @@ export default function MonthlyReportScreen() {
       {/* Main Content */}
       <ScrollView style={styles.content}>
         {isLoading ? (
-          <ThemedText style={styles.loadingText}>Loading...</ThemedText>
+          <ThemedText style={styles.loadingText}>Loading monthly data...</ThemedText>
         ) : monthlyData ? (
           <>
             {/* Monthly Summary Cards */}
@@ -146,12 +183,18 @@ export default function MonthlyReportScreen() {
                 <ThemedText style={styles.summaryValue}>
                   {Math.round(monthlyData.totalCalories)}
                 </ThemedText>
+                <ThemedText style={styles.summarySubtext}>
+                  Goal: {dailyGoal * monthlyData.totalMeals} cal
+                </ThemedText>
               </View>
               
               <View style={[styles.summaryCard, { backgroundColor: colors.tint + '20' }]}>
                 <ThemedText style={styles.summaryTitle}>Daily Average</ThemedText>
                 <ThemedText style={styles.summaryValue}>
                   {Math.round(monthlyData.averageCalories)}
+                </ThemedText>
+                <ThemedText style={styles.summarySubtext}>
+                  Goal: {dailyGoal} cal
                 </ThemedText>
               </View>
               
@@ -239,6 +282,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 15,
   },
+  headerRow: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#ddd',
+    paddingBottom: 15,
+    marginBottom: 5,
+  },
   dailyItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -247,21 +296,64 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  dateText: {
-    fontSize: 16,
+  columnHeader: {
+    fontSize: 13,
+    fontWeight: '600',
+    opacity: 0.7,
+    textTransform: 'uppercase',
   },
-  dailyStats: {
-    flexDirection: 'row',
+  dateContainer: {
+    width: 45,
     alignItems: 'center',
   },
+  dateText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  dailyStats: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  calorieContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 8,
+  },
+  calorieHeader: {
+    flex: 1,
+  },
+  goalHeader: {
+    width: 60,
+    textAlign: 'right',
+  },
+  calorieValue: {
+    flex: 1,
+  },
   calorieText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
-    marginRight: 15,
+  },
+  mealCountHeader: {
+    width: 80,
+    textAlign: 'right',
+    paddingLeft: 12,
   },
   mealCountText: {
     fontSize: 14,
     opacity: 0.8,
+    width: 80,
+    textAlign: 'right',
+    paddingLeft: 12,
+  },
+  goalProgress: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    width: 60,
+    textAlign: 'right',
   },
   loadingText: {
     textAlign: 'center',
@@ -273,5 +365,10 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontSize: 16,
     opacity: 0.8,
+  },
+  summarySubtext: {
+    fontSize: 12,
+    opacity: 0.8,
+    marginTop: 4,
   },
 }); 

@@ -1,5 +1,6 @@
-import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { databaseService, MonthlySummary } from '../services/databaseService';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { sqliteDatabase } from '../services/sqliteDatabaseService';
+import { DailyGoals, MonthlySummary } from '../types/database';
 
 /**
  * Represents a single meal entry in the app
@@ -21,6 +22,7 @@ export interface Meal {
 interface MealContextType {
   meals: Meal[];                          // Current day's meals
   totalCalories: number;                  // Total calories for the current day
+  dailyGoal: number;                      // User's daily calorie goal
   isLoading: boolean;                     // Loading state for async operations
   error: string | null;                   // Error state for failed operations
   currentDate: Date;                      // Current date being viewed
@@ -31,6 +33,7 @@ interface MealContextType {
   refreshMeals: () => Promise<void>;
   getMonthlySummary: (month: number, year: number) => Promise<MonthlySummary>;
   refreshCurrentDate: () => void;
+  updateDailyGoal: (goal: number) => Promise<void>;  // New function to update daily goal
 }
 
 // Create the context with undefined as initial value
@@ -40,63 +43,66 @@ const MealContext = createContext<MealContextType | undefined>(undefined);
  * Provider component for the MealContext
  * Manages all meal-related state and operations
  */
-export function MealProvider({ children }: { children: ReactNode }) {
+export const MealProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // State management
   const [meals, setMeals] = useState<Meal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [monthlySummary, setMonthlySummary] = useState<MonthlySummary | null>(null);
+  const [dailyGoal, setDailyGoal] = useState(2000); // Default daily goal
 
-  // Load meals and check date on mount
+  // Initialize database and load data
   useEffect(() => {
-    loadMeals();
-    checkDateChange();
-  }, []);
-
-  // Check for date change every minute
-  useEffect(() => {
-    const interval = setInterval(checkDateChange, 60000);
-    return () => clearInterval(interval);
+    loadInitialData();
   }, []);
 
   /**
-   * Checks if the current date has changed
-   * If it has, updates the current date and reloads meals
+   * Loads all initial data from the database
+   * Includes meals, daily goal, and monthly summary
    */
-  const checkDateChange = () => {
-    const now = new Date();
-    if (now.getDate() !== currentDate.getDate() ||
-        now.getMonth() !== currentDate.getMonth() ||
-        now.getFullYear() !== currentDate.getFullYear()) {
-      setCurrentDate(now);
-      loadMeals();
-    }
-  };
-
-  /**
-   * Loads meals for the current date and updates the monthly summary
-   */
-  const loadMeals = async () => {
+  const loadInitialData = async () => {
     try {
       setIsLoading(true);
-      // Get meals for the current date
-      const todayMeals = await databaseService.getDailyMeals(currentDate);
-      setMeals(todayMeals);
-      
+      const today = new Date();
+      const [loadedMeals, goals] = await Promise.all([
+        sqliteDatabase.getMealsByDate(today),
+        sqliteDatabase.loadDailyGoals()
+      ]);
+
+      setMeals(loadedMeals);
+      if (goals) {
+        setDailyGoal(goals.calories);
+      }
+
       // Load current month's summary
-      const summary = await databaseService.getMonthlySummary(
-        currentDate.getMonth(),
-        currentDate.getFullYear()
+      const summary = await sqliteDatabase.getMonthlySummary(
+        today.getMonth(),
+        today.getFullYear()
       );
       setMonthlySummary(summary);
       
       setError(null);
     } catch (err) {
       console.error('Error loading meals:', err);
-      setError('Failed to load meals from storage');
+      setError('Failed to load meals from database');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  /**
+   * Loads the user's daily calorie goal from the database
+   */
+  const loadDailyGoal = async () => {
+    try {
+      const goals = await sqliteDatabase.loadDailyGoals();
+      if (goals) {
+        setDailyGoal(goals.calories);
+      }
+    } catch (err) {
+      console.error('Error loading daily goal:', err);
+      setError('Failed to load daily goal');
     }
   };
 
@@ -106,7 +112,7 @@ export function MealProvider({ children }: { children: ReactNode }) {
    */
   const getMonthlySummary = async (month: number, year: number) => {
     try {
-      const summary = await databaseService.getMonthlySummary(month, year);
+      const summary = await sqliteDatabase.getMonthlySummary(month, year);
       // Update current month's summary if the requested month is current
       if (month === currentDate.getMonth() && year === currentDate.getFullYear()) {
         setMonthlySummary(summary);
@@ -114,7 +120,8 @@ export function MealProvider({ children }: { children: ReactNode }) {
       return summary;
     } catch (err) {
       console.error('Error getting monthly summary:', err);
-      throw new Error('Failed to get monthly summary');
+      setError('Failed to get monthly summary');
+      throw err;
     }
   };
 
@@ -124,7 +131,29 @@ export function MealProvider({ children }: { children: ReactNode }) {
    */
   const refreshCurrentDate = () => {
     setCurrentDate(new Date());
-    loadMeals();
+    loadInitialData();
+  };
+
+  /**
+   * Updates the daily calorie goal in the database
+   */
+  const updateDailyGoal = async (newGoal: number) => {
+    try {
+      const goals: DailyGoals = {
+        calories: newGoal,
+        protein: 0, // Default values for other macros
+        carbs: 0,
+        fat: 0
+      };
+      
+      await sqliteDatabase.saveDailyGoals(goals);
+      setDailyGoal(newGoal);
+      setError(null);
+    } catch (err) {
+      console.error('Error updating daily goal:', err);
+      setError('Failed to update daily goal');
+      throw err;
+    }
   };
 
   /**
@@ -133,15 +162,14 @@ export function MealProvider({ children }: { children: ReactNode }) {
    */
   const addMeal = async (meal: Omit<Meal, 'id' | 'timestamp'>) => {
     try {
-      // Create a new meal with generated ID and current timestamp
       const newMeal: Meal = {
         ...meal,
         id: Math.random().toString(36).substr(2, 9),
         timestamp: Date.now(),
       };
       
-      await databaseService.addMeal(newMeal);
-      setMeals(prevMeals => [...prevMeals, newMeal]);
+      await sqliteDatabase.addMeal(newMeal);
+      setMeals(prevMeals => [newMeal, ...prevMeals]);
       
       // Refresh monthly summary if the meal is from current month
       const currentMonth = new Date().getMonth();
@@ -150,14 +178,14 @@ export function MealProvider({ children }: { children: ReactNode }) {
       const mealYear = new Date(newMeal.timestamp).getFullYear();
       
       if (mealMonth === currentMonth && mealYear === currentYear) {
-        const summary = await databaseService.getMonthlySummary(currentMonth, currentYear);
+        const summary = await sqliteDatabase.getMonthlySummary(currentMonth, currentYear);
         setMonthlySummary(summary);
       }
       
       setError(null);
     } catch (err) {
       console.error('Error adding meal:', err);
-      setError('Failed to add meal to storage');
+      setError('Failed to add meal to database');
       throw err;
     }
   };
@@ -169,7 +197,7 @@ export function MealProvider({ children }: { children: ReactNode }) {
   const removeMeal = async (id: string) => {
     try {
       const mealToRemove = meals.find(meal => meal.id === id);
-      await databaseService.removeMeal(id);
+      await sqliteDatabase.removeMeal(id);
       setMeals(prevMeals => prevMeals.filter(meal => meal.id !== id));
       
       // Refresh monthly summary if the removed meal was from current month
@@ -180,7 +208,7 @@ export function MealProvider({ children }: { children: ReactNode }) {
         const mealYear = new Date(mealToRemove.timestamp).getFullYear();
         
         if (mealMonth === currentMonth && mealYear === currentYear) {
-          const summary = await databaseService.getMonthlySummary(currentMonth, currentYear);
+          const summary = await sqliteDatabase.getMonthlySummary(currentMonth, currentYear);
           setMonthlySummary(summary);
         }
       }
@@ -188,7 +216,7 @@ export function MealProvider({ children }: { children: ReactNode }) {
       setError(null);
     } catch (err) {
       console.error('Error removing meal:', err);
-      setError('Failed to remove meal from storage');
+      setError('Failed to remove meal from database');
       throw err;
     }
   };
@@ -198,7 +226,7 @@ export function MealProvider({ children }: { children: ReactNode }) {
    */
   const getMealsByDate = async (date: Date) => {
     try {
-      return await databaseService.getMealsByDate(date);
+      return await sqliteDatabase.getMealsByDate(date);
     } catch (err) {
       console.error('Error getting meals by date:', err);
       setError('Failed to get meals by date');
@@ -210,7 +238,7 @@ export function MealProvider({ children }: { children: ReactNode }) {
    * Refreshes the current day's meals
    */
   const refreshMeals = async () => {
-    await loadMeals();
+    await loadInitialData();
   };
 
   // Calculate total calories for the current day
@@ -221,6 +249,7 @@ export function MealProvider({ children }: { children: ReactNode }) {
     <MealContext.Provider value={{ 
       meals, 
       totalCalories, 
+      dailyGoal,
       addMeal, 
       removeMeal,
       getMealsByDate,
@@ -230,12 +259,13 @@ export function MealProvider({ children }: { children: ReactNode }) {
       currentDate,
       monthlySummary,
       getMonthlySummary,
-      refreshCurrentDate
+      refreshCurrentDate,
+      updateDailyGoal
     }}>
       {children}
     </MealContext.Provider>
   );
-}
+};
 
 /**
  * Custom hook to use the MealContext

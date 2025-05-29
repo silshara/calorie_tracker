@@ -2,8 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
+import { Colors } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import ParallaxScrollView from '../../components/ParallaxScrollView';
 import { ThemedText } from '../../components/ThemedText';
 import { ThemedView } from '../../components/ThemedView';
@@ -11,9 +13,13 @@ import { Meal, useMeals } from '../context/MealContext';
 import { analyzeFoodImage } from '../services/openRouterService';
 
 export default function HomeScreen() {
-  const { meals, totalCalories, addMeal, removeMeal } = useMeals();
+  const { meals, totalCalories, dailyGoal, addMeal, removeMeal, updateDailyGoal } = useMeals();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isEditingGoal, setIsEditingGoal] = useState(false);
+  const [newGoal, setNewGoal] = useState(dailyGoal.toString());
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
 
   const pickImage = async () => {
     try {
@@ -124,6 +130,29 @@ export default function HomeScreen() {
     );
   };
 
+  /**
+   * Handles updating the daily calorie goal
+   * Validates input and shows error if invalid
+   */
+  const handleUpdateGoal = async () => {
+    const goal = parseInt(newGoal);
+    if (isNaN(goal) || goal < 500 || goal > 10000) {
+      Alert.alert(
+        'Invalid Goal',
+        'Please enter a valid calorie goal between 500 and 10000 calories.'
+      );
+      return;
+    }
+
+    try {
+      await updateDailyGoal(goal);
+      setIsEditingGoal(false);
+    } catch (err) {
+      console.error('Error updating goal:', err);
+      Alert.alert('Error', 'Failed to update daily goal. Please try again.');
+    }
+  };
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#4CAF50', dark: '#1B5E20' }}
@@ -139,8 +168,19 @@ export default function HomeScreen() {
         <ThemedText type="title">Today's Summary</ThemedText>
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
-            <ThemedText type="defaultSemiBold">Calories</ThemedText>
-            <ThemedText type="title">{totalCalories} / 2000</ThemedText>
+            <View style={styles.goalHeader}>
+              <ThemedText type="defaultSemiBold">Calories</ThemedText>
+              <TouchableOpacity
+                onPress={() => {
+                  setNewGoal(dailyGoal.toString());
+                  setIsEditingGoal(true);
+                }}
+                style={styles.editButton}
+              >
+                <Ionicons name="pencil" size={16} color={colors.tint} />
+              </TouchableOpacity>
+            </View>
+            <ThemedText type="title">{totalCalories} / {dailyGoal}</ThemedText>
           </View>
           <View style={styles.statItem}>
             <ThemedText type="defaultSemiBold">Meals</ThemedText>
@@ -152,6 +192,44 @@ export default function HomeScreen() {
           </View> */}
         </View>
       </ThemedView>
+
+      {/* Goal Edit Modal */}
+      <Modal
+        visible={isEditingGoal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsEditingGoal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <ThemedView style={styles.modalContent}>
+            <ThemedText type="title" style={styles.modalTitle}>
+              Set Daily Calorie Goal
+            </ThemedText>
+            <TextInput
+              style={[styles.input, { color: colors.text }]}
+              value={newGoal}
+              onChangeText={setNewGoal}
+              keyboardType="numeric"
+              placeholder="Enter daily calorie goal"
+              placeholderTextColor={colors.text + '80'}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setIsEditingGoal(false)}
+              >
+                <ThemedText>Cancel</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton, { backgroundColor: colors.tint }]}
+                onPress={handleUpdateGoal}
+              >
+                <ThemedText style={styles.saveButtonText}>Save</ThemedText>
+              </TouchableOpacity>
+            </View>
+          </ThemedView>
+        </View>
+      </Modal>
 
       {/* Quick Actions */}
       <ThemedView style={styles.sectionContainer}>
@@ -347,5 +425,60 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     padding: 4,
+  },
+  goalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  editButton: {
+    padding: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '80%',
+    padding: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    marginBottom: 20,
+  },
+  input: {
+    width: '100%',
+    height: 40,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    marginBottom: 20,
+    fontSize: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 10,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  saveButton: {
+    backgroundColor: '#4CAF50',
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
   },
 });
