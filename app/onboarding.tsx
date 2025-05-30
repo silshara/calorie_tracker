@@ -30,12 +30,12 @@ const onboardingData = [
   {
     title: 'Smart Food Analysis',
     description: 'Simply take a photo of your food and let our AI analyze its nutritional content instantly. Get accurate calorie and nutrient information.',
-    image: require('@/assets/images/healthy-food.jpg'),
+    image: require('@/assets/images/healthy-food2.png'),
   },
   {
     title: 'Track Your Progress',
     description: 'Monitor your daily calorie intake, set nutrition goals, and track your progress over time. Stay motivated on your health journey.',
-    image: require('@/assets/images/healthy-food.jpg'),
+    image: require('@/assets/images/healthy-food3.jpg'),
   },
 ];
 
